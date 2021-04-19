@@ -38,9 +38,15 @@ use structopt::StructOpt;
 /// process at index 1.
 ///
 /// These processes are expected to perform some kind of aggregation
-/// and print at the end of their execution. Make sure this buffering
-/// occurs to prevent line overlap! E.g., pipe into `sponge` if
-/// your process is unbuffered.
+/// and print at the end of their execution. For instance, suppose we invoke
+/// `slb 'awk -f catter.awk'` where `catter.awk` is just defined to be
+/// `{key = $1; $1 = ""; a[key] += $0}END{for (k in a) print k,a[k]}`,
+/// which just concatenates the keyed values. Then the output might be
+///
+/// ```
+/// key1  a b c d a b
+/// key2  e f g h
+/// ```
 #[derive(Debug, StructOpt)]
 #[structopt(name = "slb", about = "Performs streaming load balancing.")]
 struct Opt {
@@ -51,14 +57,17 @@ struct Opt {
     /// command-line string. Text lines from the stdin of `slb` are fed
     /// into these processes, and stdout is shared between this parent
     /// process and its children.
-    ///
-    /// These child are expected to only print when they reach EOF of
-    /// stdin; this helps avoid line buffering in `slb` which would
-    /// otherwise be necessary to prevent output line overlap.
-    ///
-    /// Any bash-compatible command (including piping) is OK.
     cmd: String,
+
+    /// Queue size for mpsc queues used for load balancing to inputs.
+    #[structopt(short, long)]
+    queuesize: Option<usize>,
+
+    /// Buffer size for reading input.
+    #[structopt(short, long)]
+    bufsize: Option<usize>,
     // arguments to consider:
+    // #[structopt(short,long)]
     // sort-like KEYDEF -k --key
     // nproc -j --jobs
     // buffer input size (buffer full stdin reads, do line parsing
@@ -81,7 +90,9 @@ fn main() {
         })
         .collect();
 
-    let (txs, rxs): (Vec<_>, Vec<_>) = (0..children.len()).map(|_| sync_channel(1024)).unzip();
+    let (txs, rxs): (Vec<_>, Vec<_>) = (0..children.len())
+        .map(|_| sync_channel(opt.queuesize.unwrap_or(16 * 1024)))
+        .unzip();
 
     rayon::spawn(move || {
         // txs captured by value here
@@ -94,7 +105,7 @@ fn main() {
             if done {
                 return None;
             }
-            let bufsize = 1024;
+            let bufsize = opt.bufsize.unwrap_or(16 * 1024);
             let mut buf = Vec::with_capacity(bufsize);
             let mut lines = Vec::with_capacity(bufsize / 8);
             // keep reading up until 5x the average line size so far
