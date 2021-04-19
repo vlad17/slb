@@ -12,8 +12,6 @@ use std::thread;
 
 use bstr::io::BufReadExt;
 use memchr::memchr;
-use rayon::iter::ParallelBridge;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use structopt::StructOpt;
 
 /// Performs streaming load balancing on stdin, handing off input
@@ -152,8 +150,8 @@ fn main() {
                 }
                 let _ = lock.lock().expect("lock");
                 drop(child_stdin);
-                let mut stdout = child.stdout.take().expect("child_stdout");
-                let mut stdout = BufReader::new(stdout);
+                let stdout = child.stdout.take().expect("child_stdout");
+                let stdout = BufReader::new(stdout);
                 stdout
                     .for_byte_line_with_terminator(|line: &[u8]| {
                         let stdout = io::stdout();
