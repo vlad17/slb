@@ -4,11 +4,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
 use std::io::{self, BufRead, BufReader, Write};
-use std::iter;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::sync_channel;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread;
 
 use bstr::io::BufReadExt;
