@@ -163,27 +163,23 @@ fn main() {
     });
     // rxs valid until txs dropped, since they loop until err
 
-    // instead of a lock here we could just use a channel to pipe stdout lines
-    let lock = Arc::new(Mutex::new(()));
     let handles: Vec<_> = children
         .into_iter()
         .zip(rxs.into_iter())
         .map(|(mut child, rx)| {
-            let lock = Arc::clone(&lock);
             thread::spawn(move || {
                 let mut child_stdin = child.stdin.take().expect("child stdin");
                 while let Ok(line) = rx.recv() {
                     child_stdin.write_all(&line).expect("write line");
                     child_stdin.write(b"\n").expect("write newline");
                 }
-                let _ = lock.lock().expect("lock");
                 drop(child_stdin);
-                let stdout = child.stdout.take().expect("child_stdout");
-                let stdout = BufReader::new(stdout);
-                stdout
-                    .for_byte_line_with_terminator(|line: &[u8]| {
-                        let stdout = io::stdout();
-                        let mut handle = stdout.lock();
+                let child_stdout = child.stdout.take().expect("child_stdout");
+                let child_stdout = BufReader::new(child_stdout);
+                let stdout = io::stdout();
+                let mut handle = stdout.lock();
+                child_stdout
+                    .for_byte_line_with_terminator(move |line: &[u8]| {
                         handle.write_all(line).map(|_| true)
                     })
                     .expect("write");
