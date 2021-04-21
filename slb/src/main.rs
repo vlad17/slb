@@ -137,7 +137,7 @@ fn main() {
         drop(read_tx);
         if verbose {
             eprintln!(
-                "avg queue len, rounding up {} (max {})",
+                "avg reader queue len, rounding up {} (max {})",
                 (total_queue_len + num_enqueues - 1) / num_enqueues,
                 reader_queue_max_size
             );
