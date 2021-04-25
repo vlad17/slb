@@ -27,7 +27,10 @@ for f in $testfiles ; do
     f="$cwd/$f"
     b=$(basename "$f")
     tr '[:upper:]' '[:lower:]' < "$f" | tr -c '[:alnum:]- ' ' ' | awk -f "$cwd/examples/wc.awk" -v RS='[[:space:]]' > "expected-$b"
-    tr '[:upper:]' '[:lower:]' < "$f" | tr -c '[:alnum:]- ' ' ' | tr '[:space:]' '\n' | rg -v '^$' | "$cwd/target/release/slb" 'awk -f '"$cwd/examples/wc.awk" > "actual-$b"
+    "$cwd/target/release/slb" \
+        --mapper 'tr "[:upper:]" "[:lower:]" | tr -c "[:alnum:]- " " " | tr "[:space:]" "\n" | rg -v "^$"' \
+        --folder 'awk -f '"$cwd/examples/wc.awk" \
+        --infile "$f" > "actual-$b"
     sort -k2nr -k1 -o "expected-$b" "expected-$b"
     sort -k2nr -k1 -o "actual-$b" "actual-$b"
     diff "expected-$b" "actual-$b" >/dev/null
