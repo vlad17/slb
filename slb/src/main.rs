@@ -84,6 +84,7 @@ struct Opt {
     #[structopt(long)]
     folder: String,
 
+    // TODO: support multiple infiles and chunkify across them
     /// The input file to read lines from.
     #[structopt(long)]
     infile: PathBuf,

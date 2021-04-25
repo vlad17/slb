@@ -6,12 +6,22 @@ Like `parallel --pipe --roundrobin` but load balancing is performed based on inp
 
 ```
 cargo build --release
-/usr/bin/time -f "%e sec %M KB" awk -f examples/wc.awk RS='[[:space:]]' lines.txt > awk.txt
-# 
-/usr/bin/time -f "%e sec %M KB" (tr '[[:space:]]' '\n' lines.txt | cargo/release/slb 'awk -f examples/wc.awk' > slb.txt)
-# 
-diff <(sort awk.txt) <(sort slb.txt) ; echo $?
-# 
+curl -o enwik9.bz2 https://cs.fit.edu/~mmahoney/compression/enwik9.bz2
+bunzip2 enwik9.bz2
+examples/clean.sh < enwik9 > enwik9.clean ; rm enwik9
+
+/usr/bin/time -f "%e sec" awk -f examples/wc.awk enwik9.clean > wikawk.txt
+# 203.97 sec
+
+/usr/bin/time -f "%e sec" target/release/slb \
+  --mapper 'tr " " "\n" | rg -v "^$"' \
+  --folder "awk '{a[\$0]++}END{for(k in a)print k,a[k]}'" \
+  --infile enwik9.clean \
+  --outprefix wikslb.
+# 6.20 sec
+
+diff <(sort wikawk.txt) <(cat wikslb.* | sort) ; echo $?
+# 0
 ```
 
 ## Feature Frequency Calculation
@@ -34,7 +44,7 @@ parallel --pipepart -a kdd12.tr wc -w | awk '{a+=$0}END{print a}'
 
 /usr/bin/time -f "%e sec %M KB" target/release/slb \
   --mapper 'sed -E "s/^[^ ]+ //" | sed -E "s/:[^ ]+//g" | tr " " "\n" | rg -v "^$"' \
-  --folder 'awk -f examples/wc.awk' \
+  --folder "awk '{a[\$0]++}END{for(k in a)print k,a[k]}'" \
   --infile kdd12.tr \
   --outprefix results-slb.
 # 136.29 sec 881360 KB
