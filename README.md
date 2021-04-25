@@ -14,7 +14,9 @@ diff <(sort awk.txt) <(sort slb.txt) ; echo $?
 # 
 ```
 
-And here's an example of counting the frequency of features in sparse SVM format of a large dataset, benchmarked on the large KDD12 dataset on a 32-core machine (assumes [ripgrep](https://github.com/BurntSushi/ripgrep), [GNU Parallel](https://www.gnu.org/software/parallel/) are installed). 
+## Feature Frequency Calculation
+
+Here's an example of counting the frequency of features in sparse [SVMlight](https://www.cs.cornell.edu/people/tj/svm_light/) format of a large dataset, benchmarked on the large KDD12 dataset on a 32-core machine (assumes [ripgrep](https://github.com/BurntSushi/ripgrep), [GNU Parallel](https://www.gnu.org/software/parallel/) are installed). 
 
 ```
 echo 'will cite' | parallel --citation 1>/dev/null 2>/dev/null
@@ -33,15 +35,19 @@ parallel --pipepart -a kdd12.tr wc -w | awk '{a+=$0}END{print a}'
 /usr/bin/time -f "%e sec %M KB" target/release/slb \
   --mapper 'sed -E "s/^[^ ]+ //" | sed -E "s/:[^ ]+//g" | tr " " "\n" | rg -v "^$"' \
   --folder 'awk -f examples/wc.awk' \
-  --infile kdd12.tr > results-slb.txt
-# 254.82 sec 881364 KB
+  --infile kdd12.tr \
+  --outprefix results-slb.
+# 136.29 sec 881360 KB
+# note above doesn't count child memory
+# eyeballing htop, max memory use is ~12.3GB
 
 # check we're correct
-sort --parallel=$(($(nproc) / 2)) -k2nr -k 1 -o results-slb.txt results-slb.txt & \
+cat results-slb.* > results-slb-cat && rm results-slb.*
+sort --parallel=$(($(nproc) / 2)) -k2nr -k 1 -o results-slb-cat results-slb-cat & \
 sort --parallel=$(($(nproc) / 2)) -k2nr -k 1 -o results-awk.txt results-awk.txt & \
 wait
 
-diff results-slb.txt results-awk.txt >/dev/null ; echo $?
+diff results-slb-cat results-awk.txt >/dev/null ; echo $?
 # 0
 ```
 

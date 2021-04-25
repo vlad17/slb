@@ -2,7 +2,8 @@
 
 use std::path::PathBuf;
 use std::ops::Deref;
-use std::io::{self, BufReader, Write};
+use std::fs::File;
+use std::io::{self, BufReader, BufWriter, Write};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::sync_channel;
@@ -56,8 +57,11 @@ use slb::{fileblocks,sharder};
 /// which just concatenates the keyed values. Then the output might be
 ///
 /// ```
-/// key1  a b c d a b
+/// <file outprefix0.txt>
 /// key2  e f g h
+///
+/// <file outprefix1.txt>
+/// key1  a b c d a b
 /// ```
 #[derive(Debug, StructOpt)]
 #[structopt(name = "slb", about = "Performs streaming load balancing.")]
@@ -84,6 +88,9 @@ struct Opt {
     #[structopt(long)]
     infile: PathBuf,
 
+    /// Output file prefixes.
+    #[structopt(long)]
+    outprefix: PathBuf,
 
     /// Buffer size in KB for reading chunks of input, parameter
     /// shared between both mapper and folder right now.
@@ -195,23 +202,33 @@ fn main() {
     // expectation of folder procs
     let folder_input_output_threads: Vec<_> = folder_processes.into_iter()
         .zip(rxs.into_iter())
-        .map(|(mut child, rx)| {
+        .enumerate()
+        .map(|(i, (mut child, rx))| {
+            let outprefix = opt.outprefix.clone();
             thread::spawn(move || {
                 let mut child_stdin = child.stdin.take().expect("child stdin");
                 while let Ok(lines) = rx.recv() {
                     child_stdin.write_all(&lines).expect("write lines");
                 }
                 drop(child_stdin);
+                
                 let child_stdout = child.stdout.take().expect("child_stdout");
                 let child_stdout = BufReader::new(child_stdout);
-                let stdout = io::stdout();
-                let mut handle = stdout.lock();
+
+                let width = format!("{}", nthreads-1).len();
+                let suffix = format!("{:0>width$}", i, width=width);
+                let mut fname = outprefix.file_name().expect("file name").to_owned();
+                fname.push(&suffix);
+                let path = outprefix.with_file_name(fname);
+                let file = File::create(&path).expect("write file");
+                let mut file = BufWriter::new(file);
                 child_stdout
-                    .for_byte_line_with_terminator(move |line: &[u8]| {
-                        handle.write_all(line).map(|_| true)
+                    .for_byte_line_with_terminator(|line: &[u8]| {
+                        file.write_all(line).map(|_| true)
                     })
                     .expect("write");
                 assert!(child.wait().expect("wait").success());
+                file.flush().expect("flush");
             })
         })
         .collect();
