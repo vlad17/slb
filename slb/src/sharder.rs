@@ -39,7 +39,7 @@ where
 
 fn hash_key(bytes: &[u8], npartitions: u64) -> usize {
     let end = memchr(b' ', bytes).unwrap_or(bytes.len());
-    // consider faster hasher?
+    // TODO: consider faster hasher?
     let mut hasher = DefaultHasher::default();
     bytes[..end].hash(&mut hasher);
     (hasher.finish() % npartitions) as usize
