@@ -125,7 +125,7 @@ Note the above examples demonstrate the convenience of the tool:
 * For large datasets, parallelism is essential.
 * Compared to an equivalent map-reduce, we use less memory, less time, and less code.
 
-The last point holds because `slb` ensures each parallel invocation recieves a _unique partition_ of the key space. In turn, we use less memory because each `wc.awk` process is only tracking counts for its own key space and less code because we do not need to write a combiner that merges two feature count maps.
+The last point holds because `slb` ensures each parallel invocation recieves a _unique partition_ of the key space. In turn, we use less memory because each folder is only tracking aggregates for its own key space and less code because we do not need to write a combiner that merges two maps.
 
 To install locally, run
 
