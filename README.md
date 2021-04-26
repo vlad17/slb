@@ -22,7 +22,37 @@ diff <(sort wikawk.txt) <(cat wikslb.* | sort) ; echo $?
 # 0
 ```
 
-This demonstrates a "flatmap-fold" paradigm over the typical "map-reduce" one, which is simpler and faster where possible.
+This demonstrates a "flatmap-fold" paradigm over the typical "map-reduce" one.
+
+Each line
+
+```
+a    b c d -> flatmapper 1
+f g   a b -> flatmapper 2
+```
+
+is handed off to an independent flat mapper `tr " " "\n" | rg -v "^$"` which puts a word on each line
+
+```
+flatmapper 1 ->
+a
+b
+c
+d
+
+flatmapper 2 ->
+f
+g
+a
+b
+```
+
+whose outputs are then inspected line-by-line. The first word of each line is hashed (in this case, the entire line). Assuming `hash(a) == hash(b) == 1` and `hash(c) == hash(d) == hash(g) == hash(f) == 0` we'll input the corresponding keys from each flatmapper into a couple `awk '{a[$0]++}END{for(k in a)print k,a[k]}'` folders. And the outputs are then written to output files.
+
+```
+a b a b -> awk 1 -> {a: 2, b: 2} -> outprefix1
+f g c d -> awk 0 -> {f: 1, g: 1, c: 1, d: 1} -> outprefix0
+```
 
 ## Feature Frequency Calculation
 
