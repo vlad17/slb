@@ -91,19 +91,6 @@ diff results-slb results-awk.txt >/dev/null ; echo $?
 # 0
 ```
 
-Note the above demonstrates the convenience of the tool:
-
-* For large datasets, parallelism is essential.
-* Compared to an equivalent map-reduce, we use less memory, less time, and less code.
-
-The last point holds because `slb` ensures each parallel invocation recieves a _unique partition_ of the key space. In turn, we use less memory because each `wc.awk` process is only tracking counts for its own key space and less code because we do not need to write a combiner that merges two feature count maps.
-
-To install locally, run
-
-```
-cargo install --path slb/
-```
-
 ## Count Distinct Feature Values
 
 As another, similar example we could count the number of distinct values for each feature. In particular, for each feature we're looking to get the minimum of its total number of distinct values with 100 (as we might be inclined to consider anything with more than 99 values to be continuous).
@@ -131,3 +118,17 @@ diff \
 # 0
 ```
 
+## Installation
+
+Note the above examples demonstrate the convenience of the tool:
+
+* For large datasets, parallelism is essential.
+* Compared to an equivalent map-reduce, we use less memory, less time, and less code.
+
+The last point holds because `slb` ensures each parallel invocation recieves a _unique partition_ of the key space. In turn, we use less memory because each `wc.awk` process is only tracking counts for its own key space and less code because we do not need to write a combiner that merges two feature count maps.
+
+To install locally, run
+
+```
+cargo install --path slb/
+```
