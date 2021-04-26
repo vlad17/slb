@@ -2,11 +2,11 @@
 
 use std::convert::TryInto;
 use std::fs;
-use std::io::Write;
 use std::fs::File;
+use std::io::Write;
 use std::io::{BufRead, BufReader, ErrorKind};
 use std::io::{Seek, SeekFrom};
-use std::iter;
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -28,23 +28,25 @@ impl FileChunk {
     pub fn dump<W: Write>(&self, mut w: W) {
         let mut file = File::open(&self.path).expect("file available");
         file.seek(SeekFrom::Start(self.start.try_into().unwrap()))
-            .expect("seek");        
+            .expect("seek");
         let reader = BufReader::with_capacity(BUFFER_SIZE.min(self.stop - self.start), file);
         let mut current_byte = self.start;
         let stop_byte = self.stop;
 
-        reader.for_byte_line_with_terminator(|line| {
-            if current_byte >= stop_byte {
-                return Ok(false)
-            }
-            assert!(
-                current_byte < stop_byte + 1,
-                "can only overshoot if non-newline split or eof with no newline"
-            );
-            current_byte += line.len();
-            w.write(line).expect("write");
-            Ok(true)                
-        }).expect("read");
+        reader
+            .for_byte_line_with_terminator(|line| {
+                if current_byte >= stop_byte {
+                    return Ok(false);
+                }
+                assert!(
+                    current_byte < stop_byte + 1,
+                    "can only overshoot if non-newline split or eof with no newline"
+                );
+                current_byte += line.len();
+                w.write(line).expect("write");
+                Ok(true)
+            })
+            .expect("read");
     }
 }
 

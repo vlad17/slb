@@ -1,10 +1,10 @@
 //! Shard by first key into buffers.
 
-use std::io::BufRead;
-use std::convert::TryInto;
 use std::collections::hash_map::DefaultHasher;
-use std::mem;
+use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
+use std::io::BufRead;
+use std::mem;
 
 use bstr::io::BufReadExt;
 use memchr::memchr;
@@ -17,10 +17,11 @@ use memchr::memchr;
 /// hash space partition).
 ///
 /// `bufsize` is the size of each buffer per partition before flush.
-pub fn shard<R,F>(r: R, npartitions: usize, bufsize: usize, mut f: F)
+pub fn shard<R, F>(r: R, npartitions: usize, bufsize: usize, mut f: F)
 where
     R: BufRead,
-    F: FnMut(usize, Vec<u8>) {
+    F: FnMut(usize, Vec<u8>),
+{
     let mut bufs = vec![Vec::with_capacity(bufsize * 2); npartitions];
     let npartitions: u64 = npartitions.try_into().unwrap();
     r.for_byte_line_with_terminator(|line| {
@@ -31,7 +32,8 @@ where
             bufs[key].reserve(bufsize * 2);
         }
         Ok(true)
-    }).expect("successful byte line read");
+    })
+    .expect("successful byte line read");
     for (i, buf) in bufs.into_iter().enumerate() {
         f(i, buf)
     }

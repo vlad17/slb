@@ -1,11 +1,11 @@
 //! `slb` main executable
 
-use std::path::PathBuf;
-use std::ops::Deref;
 use std::fs::File;
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, Write};
+use std::ops::Deref;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU32, Ordering};
+
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::thread;
@@ -13,7 +13,7 @@ use std::thread;
 use bstr::io::BufReadExt;
 use structopt::StructOpt;
 
-use slb::{fileblocks,sharder};
+use slb::{fileblocks, sharder};
 
 /// Performs sharded load balancing on stdin, handing off input
 /// to child processes based on a hash of the first word on each line.
@@ -66,7 +66,6 @@ use slb::{fileblocks,sharder};
 #[derive(Debug, StructOpt)]
 #[structopt(name = "slb", about = "Performs streaming load balancing.")]
 struct Opt {
-
     /// A flat-map pure function, which is a bash command line string
     /// that performs line-by-line operations on the input to emit
     /// output lines for reduction.
@@ -74,7 +73,7 @@ struct Opt {
     /// By default, this is just the identity, equivalent to `cat`.
     #[structopt(long)]
     mapper: Option<String>,
-    
+
     /// The folder function.
     ///
     /// Multiple instances of this same process are created with the same
@@ -99,9 +98,8 @@ struct Opt {
     /// Note memory usage is O(bufsize * nthreads)
     #[structopt(long)]
     bufsize: Option<usize>,
-    
-    // TODO consider sort-like KEYDEF -k --key which wouldn't hash if n (numeric) flag set
 
+    // TODO consider sort-like KEYDEF -k --key which wouldn't hash if n (numeric) flag set
     /// Print debug information to stderr.
     #[structopt(long)]
     verbose: Option<bool>,
@@ -113,12 +111,11 @@ struct Opt {
     /// Defaults to num CPUs.
     #[structopt(long)]
     nthreads: Option<usize>,
-    
 }
 
 fn main() {
     let opt = Opt::from_args();
-    let verbose = opt.verbose.unwrap_or(false);
+    let _verbose = opt.verbose.unwrap_or(false);
     let nthreads = opt.nthreads.unwrap_or(num_cpus::get_physical());
     let mapper_cmd = opt.mapper.as_deref().unwrap_or("cat");
     let folder_cmd = &opt.folder;
@@ -161,16 +158,11 @@ fn main() {
     let mapper_input_threads: Vec<_> = mapper_inputs
         .into_iter()
         .zip(chunks.into_iter())
-        .map(|(input, chunk)| {
-            thread::spawn(move || {
-                chunk.dump(input)
-            })
-        }).collect();
+        .map(|(input, chunk)| thread::spawn(move || chunk.dump(input)))
+        .collect();
 
     // TODO: wrap these with atomic ints to log capacity / P(capacity=max)
-    let (txs, rxs): (Vec<_>, Vec<_>) = (0..nthreads)
-        .map(|_| sync_channel(queuesize))
-        .unzip();
+    let (txs, rxs): (Vec<_>, Vec<_>) = (0..nthreads).map(|_| sync_channel(queuesize)).unzip();
 
     let txs_ref = Arc::new(txs);
     let mapper_output_threads: Vec<_> = mapper_outputs
@@ -201,7 +193,8 @@ fn main() {
 
     // must be both I/O thread to manage livelock from stdin EOF
     // expectation of folder procs
-    let folder_input_output_threads: Vec<_> = folder_processes.into_iter()
+    let folder_input_output_threads: Vec<_> = folder_processes
+        .into_iter()
         .zip(rxs.into_iter())
         .enumerate()
         .map(|(i, (mut child, rx))| {
@@ -212,21 +205,19 @@ fn main() {
                     child_stdin.write_all(&lines).expect("write lines");
                 }
                 drop(child_stdin);
-                
+
                 let child_stdout = child.stdout.take().expect("child_stdout");
                 let child_stdout = BufReader::new(child_stdout);
 
-                let width = format!("{}", nthreads-1).len();
-                let suffix = format!("{:0>width$}", i, width=width);
+                let width = format!("{}", nthreads - 1).len();
+                let suffix = format!("{:0>width$}", i, width = width);
                 let mut fname = outprefix.file_name().expect("file name").to_owned();
                 fname.push(&suffix);
                 let path = outprefix.with_file_name(fname);
                 let file = File::create(&path).expect("write file");
                 let mut file = BufWriter::new(file);
                 child_stdout
-                    .for_byte_line_with_terminator(|line: &[u8]| {
-                        file.write_all(line).map(|_| true)
-                    })
+                    .for_byte_line_with_terminator(|line: &[u8]| file.write_all(line).map(|_| true))
                     .expect("write");
                 assert!(child.wait().expect("wait").success());
                 file.flush().expect("flush");
@@ -244,13 +235,11 @@ fn main() {
         .into_iter()
         .for_each(|handle| handle.join().expect("map output join"));
 
-    let txs = Arc::try_unwrap(txs_ref)
-        .expect("final reference");        
+    let txs = Arc::try_unwrap(txs_ref).expect("final reference");
     drop(txs); // ensure hangup of transmission channel
-    
+
     // Closures here own the fold processes
     folder_input_output_threads
         .into_iter()
         .for_each(|handle| handle.join().expect("fold join"));
 }
-
