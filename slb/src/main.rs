@@ -214,6 +214,8 @@ fn main() {
                 let mut fname = outprefix.file_name().expect("file name").to_owned();
                 fname.push(&suffix);
                 let path = outprefix.with_file_name(fname);
+                // TODO: why am I copying this stream manually for no reason? This file should
+                // just be handed to the folder output stdout() directly...
                 let file = File::create(&path).expect("write file");
                 let mut file = BufWriter::new(file);
                 child_stdout
