@@ -3,9 +3,17 @@ name = "slb"
 version = "0.1.0"
 authors = ["Vladimir Feinberg <vladimir.feinberg@gmail.com>"]
 edition = "2018"
+license-file = "../LICENSE"
+description = "Sharded load balancing text-streaming Unix tool"
+homepage = "https://github.com/vlad17/slb"
+repository = "https://github.com/vlad17/slb"
+readme = "../README.md"
+keywords = ["stream", "text", "parallel", "cli"]
+categories = ["command-line-utilities", "concurrency"]
 
 [dependencies]
 memchr = "2.3"
 structopt = "0.3"
 num_cpus = "1.13"
 bstr = "0.2"
+
