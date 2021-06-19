@@ -3,7 +3,6 @@
 Like `parallel --pipe --roundrobin` but load balancing is performed based on input line hashing. When performing keyed aggregations in child processes this is crucial since then only one shard contains a given key. Here's a word count example on a 16-physical-cpu machine:
 
 ```
-cargo build --release
 curl -o enwik9.bz2 https://cs.fit.edu/~mmahoney/compression/enwik9.bz2
 bunzip2 enwik9.bz2
 examples/clean.sh < enwik9 > enwik9.clean ; rm enwik9
@@ -127,8 +126,8 @@ Note the above examples demonstrate the convenience of the tool:
 
 The last point holds because `slb` ensures each parallel invocation recieves a _unique partition_ of the key space. In turn, we use less memory because each folder is only tracking aggregates for its own key space and less code because we do not need to write a combiner that merges two maps.
 
-To install locally, run
+To install locally from `crates.io`, run
 
 ```
-cargo install --path slb/
+cargo install slb
 ```
