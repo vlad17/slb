@@ -10,7 +10,7 @@ examples/clean.sh < enwik9 > enwik9.clean ; rm enwik9
 /usr/bin/time -f "%e sec" awk -f examples/wc.awk enwik9.clean > wikawk.txt
 # 203.97 sec
 
-/usr/bin/time -f "%e sec" target/release/slb \
+/usr/bin/time -f "%e sec" slb \
   --mapper 'tr " " "\n" | rg -v "^$"' \
   --folder "awk '{a[\$0]++}END{for(k in a)print k,a[k]}'" \
   --infile enwik9.clean \
@@ -71,7 +71,7 @@ parallel --pipepart -a kdd12.tr wc -w | awk '{a+=$0}END{print a}'
 /usr/bin/time -f "%e sec %M KB" awk -f examples/svm-featurecount.awk kdd12.tr > results-awk.txt
 # 1032.18 sec 13721032 KB
 
-/usr/bin/time -f "%e sec %M KB" target/release/slb \
+/usr/bin/time -f "%e sec %M KB" slb \
   --mapper 'sed -E "s/^[^ ]+ //" | sed -E "s/:[^ ]+//g" | tr " " "\n" | rg -v "^$"' \
   --folder "awk '{a[\$0]++}END{for(k in a)print k,a[k]}'" \
   --infile kdd12.tr \
@@ -103,7 +103,7 @@ du -hs kdda
 /usr/bin/time -f "%e sec %M KB" awk -f examples/svm-countdistinct.awk kdda > cdawk.txt
 # 388.72 sec 23895104 KB
 
-/usr/bin/time -f "%e sec %M KB" target/release/slb \
+/usr/bin/time -f "%e sec %M KB" slb \
   --mapper 'sed -E "s/^[^ ]+ //" | tr " " "\n" | tr ":" " " | rg -v "^$"' \
   --folder "awk '{if(!(\$1 in a)||length(a[\$1])<100)a[\$1][\$2]=1}END{for(k in a)print k,length(a[k])}'" \
   --infile kdda \
@@ -131,3 +131,10 @@ To install locally from `crates.io`, run
 ```
 cargo install slb
 ```
+
+## Dev Stuff
+
+Rudimentary testing via `./test.sh`.
+
+Re-publish to `crates.io` with `cd slb && cargo publish`.
+
