@@ -3,7 +3,6 @@
 Like `parallel --pipe --roundrobin` but load balancing is performed based on input line hashing. When performing keyed aggregations in child processes this is crucial since then only one shard contains a given key. Here's a word count example on a 16-physical-cpu machine:
 
 ```
-cargo build --release
 curl -o enwik9.bz2 https://cs.fit.edu/~mmahoney/compression/enwik9.bz2
 bunzip2 enwik9.bz2
 examples/clean.sh < enwik9 > enwik9.clean ; rm enwik9
@@ -11,7 +10,7 @@ examples/clean.sh < enwik9 > enwik9.clean ; rm enwik9
 /usr/bin/time -f "%e sec" awk -f examples/wc.awk enwik9.clean > wikawk.txt
 # 203.97 sec
 
-/usr/bin/time -f "%e sec" target/release/slb \
+/usr/bin/time -f "%e sec" slb \
   --mapper 'tr " " "\n" | rg -v "^$"' \
   --folder "awk '{a[\$0]++}END{for(k in a)print k,a[k]}'" \
   --infile enwik9.clean \
@@ -72,7 +71,7 @@ parallel --pipepart -a kdd12.tr wc -w | awk '{a+=$0}END{print a}'
 /usr/bin/time -f "%e sec %M KB" awk -f examples/svm-featurecount.awk kdd12.tr > results-awk.txt
 # 1032.18 sec 13721032 KB
 
-/usr/bin/time -f "%e sec %M KB" target/release/slb \
+/usr/bin/time -f "%e sec %M KB" slb \
   --mapper 'sed -E "s/^[^ ]+ //" | sed -E "s/:[^ ]+//g" | tr " " "\n" | rg -v "^$"' \
   --folder "awk '{a[\$0]++}END{for(k in a)print k,a[k]}'" \
   --infile kdd12.tr \
@@ -104,7 +103,7 @@ du -hs kdda
 /usr/bin/time -f "%e sec %M KB" awk -f examples/svm-countdistinct.awk kdda > cdawk.txt
 # 388.72 sec 23895104 KB
 
-/usr/bin/time -f "%e sec %M KB" target/release/slb \
+/usr/bin/time -f "%e sec %M KB" slb \
   --mapper 'sed -E "s/^[^ ]+ //" | tr " " "\n" | tr ":" " " | rg -v "^$"' \
   --folder "awk '{if(!(\$1 in a)||length(a[\$1])<100)a[\$1][\$2]=1}END{for(k in a)print k,length(a[k])}'" \
   --infile kdda \
@@ -127,8 +126,15 @@ Note the above examples demonstrate the convenience of the tool:
 
 The last point holds because `slb` ensures each parallel invocation recieves a _unique partition_ of the key space. In turn, we use less memory because each folder is only tracking aggregates for its own key space and less code because we do not need to write a combiner that merges two maps.
 
-To install locally, run
+To install locally from `crates.io`, run
 
 ```
-cargo install --path slb/
+cargo install slb
 ```
+
+## Dev Stuff
+
+Rudimentary testing via `./test.sh`.
+
+Re-publish to `crates.io` with `cd slb && cargo publish`.
+
