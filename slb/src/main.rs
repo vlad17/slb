@@ -1,7 +1,7 @@
 //! `slb` main executable
 
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, Write};
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -10,7 +10,6 @@ use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::thread;
 
-use bstr::io::BufReadExt;
 use structopt::StructOpt;
 
 use slb::{fileblocks, sharder};
@@ -182,11 +181,19 @@ fn main() {
 
     let folder_processes: Vec<_> = (0..nthreads)
         .map(|i| {
+            let outprefix = opt.outprefix.clone();
+            let width = format!("{}", nthreads - 1).len();
+            let suffix = format!("{:0>width$}", i, width = width);
+            let mut fname = outprefix.file_name().expect("file name").to_owned();
+            fname.push(&suffix);
+            let path = outprefix.with_file_name(fname);
+            let file = File::create(&path).expect("write file");
+
             Command::new("/bin/bash")
                 .arg("-c")
                 .arg(folder_cmd)
                 .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
+                .stdout(file)
                 .spawn()
                 .unwrap_or_else(|err| panic!("error spawn fold child {}: {}", i, err))
         })
@@ -197,9 +204,7 @@ fn main() {
     let folder_input_output_threads: Vec<_> = folder_processes
         .into_iter()
         .zip(rxs.into_iter())
-        .enumerate()
-        .map(|(i, (mut child, rx))| {
-            let outprefix = opt.outprefix.clone();
+        .map(|(mut child, rx)| {
             thread::spawn(move || {
                 let mut child_stdin = child.stdin.take().expect("child stdin");
                 while let Ok(lines) = rx.recv() {
@@ -207,23 +212,7 @@ fn main() {
                 }
                 drop(child_stdin);
 
-                let child_stdout = child.stdout.take().expect("child_stdout");
-                let child_stdout = BufReader::new(child_stdout);
-
-                let width = format!("{}", nthreads - 1).len();
-                let suffix = format!("{:0>width$}", i, width = width);
-                let mut fname = outprefix.file_name().expect("file name").to_owned();
-                fname.push(&suffix);
-                let path = outprefix.with_file_name(fname);
-                // TODO: why am I copying this stream manually for no reason? This file should
-                // just be handed to the folder output stdout() directly...
-                let file = File::create(&path).expect("write file");
-                let mut file = BufWriter::new(file);
-                child_stdout
-                    .for_byte_line_with_terminator(|line: &[u8]| file.write_all(line).map(|_| true))
-                    .expect("write");
                 assert!(child.wait().expect("wait").success());
-                file.flush().expect("flush");
             })
         })
         .collect();
