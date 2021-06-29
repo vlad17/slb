@@ -83,10 +83,9 @@ struct Opt {
     #[structopt(long)]
     folder: String,
 
-    // TODO: support multiple infiles and chunkify across them
-    /// The input file to read lines from.
+    /// The input files to read lines from.
     #[structopt(long)]
-    infile: PathBuf,
+    infile: Vec<PathBuf>,
 
     /// Output file prefixes.
     #[structopt(long)]
@@ -122,6 +121,7 @@ fn main() {
     let bufsize = opt.bufsize.unwrap_or(16) * 1024;
     let queuesize = 256;
 
+    assert!(!opt.infile.is_empty());
     // TODO: could play with mapper/folder parallelism, bufsize,
     // and queuesize being tuned. Ideally could do tuning automatically.
 
@@ -130,7 +130,8 @@ fn main() {
 
     // Allow enough chunks for parallelism but not so few the chunksize
     // is small.
-    let chunks = fileblocks::chunkify(&opt.infile, nthreads, bufsize);
+
+    let chunks = fileblocks::chunkify_multiple(&opt.infile, nthreads, bufsize);
     let nthreads = chunks.len(); // smaller b/c of min bufsize
     assert!(nthreads >= 1);
 

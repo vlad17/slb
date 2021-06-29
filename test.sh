@@ -37,5 +37,16 @@ for f in $testfiles ; do
     sort -k2nr -k1 -o "expected-$b" "expected-$b"
     sort -k2nr -k1 -o "actual-$b" "actual-$b"
     diff "expected-$b" "actual-$b" >/dev/null
+
+    split -n l/10 "$f" split-${b}-
+    "$cwd/target/release/slb" \
+        --mapper 'tr "[:space:]" "\n" | rg -v "^$"' \
+        --folder "awk '{a[\$0]++}END{for(k in a)print k,a[k]}'" \
+        --infile split-${b}-* \
+        --outprefix "actual-split-$b."
+    cat actual-split-${b}.* > "actual-split-$b"
+    rm actual-split-${b}.*
+    sort -k2nr -k1 -o "actual-split-$b" "actual-split-$b"
+    diff "actual-$b" "actual-split-$b" >/dev/null
 done 
 popd >/dev/null
