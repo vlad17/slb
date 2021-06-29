@@ -53,6 +53,7 @@ impl FileChunk {
 /// Uses up to `max_chunks + paths.len()` chunks to chunkify multiple files.
 pub fn chunkify_multiple(paths: &[PathBuf], max_chunks: usize, min_size: usize) -> Vec<FileChunk> {
     assert!(max_chunks > 0);
+    assert!(!paths.is_empty());
     let sizes: Vec<usize> = paths
         .iter()
         .map(|path| {
@@ -63,12 +64,12 @@ pub fn chunkify_multiple(paths: &[PathBuf], max_chunks: usize, min_size: usize) 
                 .unwrap()
         })
         .collect();
-    let avg_size = (sizes.iter().copied().sum::<usize>() / paths.len()).max(1);
+    let avg_size = (sizes.iter().copied().sum::<usize>() + paths.len() - 1) / paths.len();
     paths
         .iter()
         .zip(sizes.into_iter())
         .flat_map(|(path, sz)| {
-            let desired_chunks: usize = (sz / avg_size).max(1);
+            let desired_chunks: usize = (sz + avg_size - 1) / avg_size;
             chunkify(&path, desired_chunks, min_size).into_iter()
         })
         .collect()
