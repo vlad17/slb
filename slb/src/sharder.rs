@@ -22,6 +22,12 @@ where
     R: BufRead,
     F: FnMut(usize, Vec<u8>),
 {
+    // TODO: currently memory usage here is O(bufsize * npartitions^2)
+    // we should still buffer as much as we can but keep global usage
+    // below some new `bufsize` given from command line.
+    //
+    // Can experiment with flushing only half the used bytes, prioritizing
+    // minimizing sends (so sending the largest bufs first).
     let mut bufs = vec![Vec::with_capacity(bufsize * 2); npartitions];
     let npartitions: u64 = npartitions.try_into().unwrap();
     r.for_byte_line_with_terminator(|line| {

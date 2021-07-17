@@ -24,6 +24,19 @@ pub struct FileChunk {
 }
 
 impl FileChunk {
+    /// Prepare a pre-seeked file for this chunk.
+    pub fn file(&self) -> File {
+        let mut file = File::open(&self.path).expect("file available");
+        file.seek(SeekFrom::Start(self.start.try_into().unwrap()))
+            .expect("seek");
+        file
+    }
+
+    /// Return the number of bytes to read for this chunk.
+    pub fn nbytes(&self) -> usize {
+        self.stop - self.start
+    }
+
     /// Iterates over just those lines the file chunk refers to.
     pub fn dump<W: Write>(&self, mut w: W) {
         let mut file = File::open(&self.path).expect("file available");

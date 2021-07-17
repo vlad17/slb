@@ -90,9 +90,12 @@ struct Opt {
     #[structopt(long)]
     outprefix: PathBuf,
 
-    /// Buffer size in KB for reading chunks of input.
+    /// Buffer size in KB for buffering output before it's sent to a
+    /// corresponding folder from a mapper.
     ///
-    /// Note memory usage is O(bufsize * nthreads)
+    /// Note memory usage is O(bufsize * nthreads^2) since such a buffer
+    /// is maintained for each mapper/folder pair, but there's a TODO to
+    /// fix this.
     #[structopt(long)]
     bufsize: Option<usize>,
 
@@ -147,35 +150,31 @@ fn main() {
 
     // Allow enough chunks for parallelism but not so few the chunksize
     // is small.
-    let chunks = fileblocks::chunkify_multiple(&opt.infile, nthreads, bufsize);
+    let chunks = fileblocks::chunkify_multiple(&opt.infile, nthreads, 16 * 1024);
     let nthreads = chunks.len(); // smaller b/c of min bufsize
     assert!(nthreads >= 1);
 
-    let mut mapper_processes: Vec<_> = (0..nthreads)
-        .map(|i| {
+    let mut mapper_processes: Vec<_> = chunks
+        .iter()
+        .enumerate()
+        .map(|(i, chunk)| {
             Command::new("/bin/bash")
                 .arg("-c")
-                .arg(mapper_cmd)
-                .stdin(Stdio::piped())
+                .arg(format!(
+                    "/bin/bash -c 'head -c {} | {}'",
+                    chunk.nbytes(),
+                    mapper_cmd
+                ))
+                .stdin(chunk.file())
                 .stdout(Stdio::piped())
                 .spawn()
                 .unwrap_or_else(|err| panic!("error spawn map child {}: {}", i, err))
         })
         .collect();
 
-    let (mapper_inputs, mapper_outputs): (Vec<_>, Vec<_>) = mapper_processes
+    let mapper_outputs: Vec<_> = mapper_processes
         .iter_mut()
-        .map(|child| {
-            let stdin = child.stdin.take().unwrap();
-            let stdout = child.stdout.take().unwrap();
-            (stdin, stdout)
-        })
-        .unzip();
-
-    let mapper_input_threads: Vec<_> = mapper_inputs
-        .into_iter()
-        .zip(chunks.into_iter())
-        .map(|(input, chunk)| thread::spawn(move || chunk.dump(input)))
+        .map(|child| child.stdout.take().unwrap())
         .collect();
 
     let (txs, rxs): (Vec<_>, Vec<_>) = (0..nthreads).map(|_| sync_channel(queuesize)).unzip();
@@ -250,9 +249,6 @@ fn main() {
         })
         .collect();
 
-    mapper_input_threads
-        .into_iter()
-        .for_each(|handle| handle.join().expect("map input join"));
     mapper_processes
         .into_iter()
         .for_each(|mut child| assert!(child.wait().expect("wait").success()));
