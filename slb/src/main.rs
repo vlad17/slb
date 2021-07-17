@@ -90,19 +90,17 @@ struct Opt {
     #[structopt(long)]
     outprefix: PathBuf,
 
-    /// Buffer size in KB for buffering output before it's sent to a
-    /// corresponding folder from a mapper.
+    /// Buffer size in KB for buffering output before it's sent to
+    /// folders from a mapper.
     ///
-    /// Note memory usage is O(bufsize * nthreads^2) since such a buffer
-    /// is maintained for each mapper/folder pair, but there's a TODO to
-    /// fix this.
+    /// Note memory usage is O(bufsize * nthreads).
     #[structopt(long)]
     bufsize: Option<usize>,
 
     // TODO: consider sort-like KEYDEF -k --key which wouldn't hash if n (numeric) flag set
     /// Print debug information to stderr.
     #[structopt(long)]
-    verbose: Option<bool>,
+    verbose: bool,
 
     // TODO: this isn't very useful as an option, consider removing entirely
     // or allowing a max_mappers and max_folders which controls maximum
@@ -118,15 +116,17 @@ struct Opt {
 
 fn main() {
     let opt = Opt::from_args();
-    let verbose = opt.verbose.unwrap_or(false);
+    let verbose = opt.verbose;
     let nthreads = opt.nthreads.unwrap_or(num_cpus::get_physical());
     let mapper_cmd = opt.mapper.as_deref().unwrap_or("cat");
     let folder_cmd = &opt.folder;
-    let bufsize = opt.bufsize.unwrap_or(16) * 1024;
+    let bufsize = opt.bufsize.unwrap_or(64) * 1024;
     let queuesize = 256;
 
     assert!(!opt.infile.is_empty());
-    // TODO: could play with queuesize and mapper:folder ratio tuning.
+    // TODO: Assume bufsize is fixed due to memory constraints.
+    //
+    // We could play with queuesize and mapper:folder ratio tuning.
     // For map-constrained tasks, reducing folders past 1:1 ratio
     // probably doesn't help since folders sitting idle don't hurt anyone.
     // However, for fold-constrained tasks lower mapper ratios like 1:2, 1:4,
@@ -150,7 +150,8 @@ fn main() {
 
     // Allow enough chunks for parallelism but not so few the chunksize
     // is small.
-    let chunks = fileblocks::chunkify_multiple(&opt.infile, nthreads, 16 * 1024);
+    let read_chunk_size = 16 * 1024;
+    let chunks = fileblocks::chunkify_multiple(&opt.infile, nthreads, read_chunk_size);
     let nthreads = chunks.len(); // smaller b/c of min bufsize
     assert!(nthreads >= 1);
 

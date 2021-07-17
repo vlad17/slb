@@ -22,26 +22,42 @@ where
     R: BufRead,
     F: FnMut(usize, Vec<u8>),
 {
-    // TODO: currently memory usage here is O(bufsize * npartitions^2)
-    // we should still buffer as much as we can but keep global usage
-    // below some new `bufsize` given from command line.
-    //
-    // Can experiment with flushing only half the used bytes, prioritizing
-    // minimizing sends (so sending the largest bufs first).
-    let mut bufs = vec![Vec::with_capacity(bufsize * 2); npartitions];
+    let mut used_space = 0;
+    let mut bufs = vec![Vec::new(); npartitions];
     let npartitions: u64 = npartitions.try_into().unwrap();
     r.for_byte_line_with_terminator(|line| {
         let key = hash_key(line, npartitions);
+        used_space += line.len();
         bufs[key].extend_from_slice(line);
-        if bufs[key].len() >= bufsize {
-            f(key, mem::take(&mut bufs[key]));
-            bufs[key].reserve(bufsize * 2);
+        if used_space >= bufsize {
+            // You might be tempted to ask, why not just send the largest
+            // few buffers to avoid communication overhead? It turns out
+            // this really does not help, at least if we can view
+            // line sizes as constant (or with standard deviation much
+            // smaller than `bufsize`).
+            //
+            // The size of the largest bucket of a hash table with n keys
+            // is lg(n) on average (up to lg(lg(n)) factors). So flushing
+            // the top-k largest buffers at most gets rid of about k*lg(n)
+            // keys. With k set to asymptotically anything less than n
+            // (up to lg(n) factors), we'd be increasing the net number
+            // of flushes (calls to f) we perform.
+            //
+            // Thus, we may as well flush every buffer.
+            for (i, buf) in bufs.iter_mut().enumerate() {
+                if buf.len() > 0 {
+                    f(i, mem::take(buf));
+                }
+            }
+            used_space = 0;
         }
         Ok(true)
     })
     .expect("successful byte line read");
     for (i, buf) in bufs.into_iter().enumerate() {
-        f(i, buf)
+        if buf.len() > 0 {
+            f(i, buf)
+        }
     }
 }
 
