@@ -162,7 +162,7 @@ fn main() {
             Command::new("/bin/bash")
                 .arg("-c")
                 .arg(format!(
-                    "/bin/bash -c 'head -c {} | {}'",
+                    "head -c {} | /bin/bash -c '{}'",
                     chunk.nbytes(),
                     mapper_cmd
                 ))
